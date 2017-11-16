@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$USER_HOME$/Desktop/WGAN-tensorflow/.idea/WGAN-tensorflow.iml" filepath="$USER_HOME$/Desktop/WGAN-tensorflow/.idea/WGAN-tensorflow.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/dcgan.iml" filepath="$PROJECT_DIR$/.idea/dcgan.iml" />
+      <module fileurl="file://$USER_HOME$/Desktop/improved_wgan_training/.idea/improved_wgan_training.iml" filepath="$USER_HOME$/Desktop/improved_wgan_training/.idea/improved_wgan_training.iml" />
+    </modules>
+  </component>
+</project>
