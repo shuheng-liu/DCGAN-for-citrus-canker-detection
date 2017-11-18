@@ -1,4 +1,4 @@
-
+.gitignore
 # Created by https://www.gitignore.io/api/python
 
 ### Python ###
@@ -11,7 +11,7 @@ __pycache__/
 FLOYD_README.md
 .floydexpt
 .DS_Store
-
+.floyddata
 # C extensions
 *.so
 
