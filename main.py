@@ -259,7 +259,7 @@ for epoch in range(opt.niter):
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
         if i % 100 == 0:
             vutils.save_image(real_cpu,
-                    '%s/real_samples_epoch_%3d.png' % (opt.outf, epoch),
+                    '%s/real_samples.png' % (opt.outf),
                     normalize=True)
             fake = netG(fixed_noise)
             vutils.save_image(fake.data,
