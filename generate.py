@@ -34,6 +34,7 @@ nsample = int(opt.nsample)
 
 # Generate An Image from input json or default parameters
 for index in range(nsample):
+    print("generating image #%d of %d" % (index, nsample))
     Generator = DCGAN(netG=opt.netG, zvector=zvector, batchSize=batchSize, outf=outf, cuda=cuda, ngpu=ngpu)
     Generator.build_model()
     Generator.generate(img_name='generated_'+str(index)+'.png')
