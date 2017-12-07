@@ -157,5 +157,5 @@ class DCGAN(object):
       #print (self._input)
       fake = self._model(self._input)
       vutils.save_image(fake.data,
-                  '%s/' + img_name % (self._outf),
+                  ('%s/' + img_name) % (self._outf),
                   normalize=True)

@@ -33,7 +33,7 @@ ngpu = int(opt.ngpu)
 nsample = int(opt.nsample)
 
 # Generate An Image from input json or default parameters
-Generator = DCGAN(netG=opt.netG, zvector=zvector, batchSize=batchSize, outf=outf, cuda=cuda, ngpu=ngpu)
-Generator.build_model()
-for index in range(n_sample):
-    Generator.generate( img_name='generated'+str(nsample))
+for index in range(nsample):
+    Generator = DCGAN(netG=opt.netG, zvector=zvector, batchSize=batchSize, outf=outf, cuda=cuda, ngpu=ngpu)
+    Generator.build_model()
+    Generator.generate(img_name='generated_'+str(index)+'.png')
