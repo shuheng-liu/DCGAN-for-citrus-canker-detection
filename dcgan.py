@@ -153,9 +153,9 @@ class DCGAN(object):
 
 
     # Generate the image and store in the output folder
-    def generate(self):
+    def generate(self, img_name = 'generated.png'):
       #print (self._input)
       fake = self._model(self._input)
       vutils.save_image(fake.data,
-                  '%s/generated.png' % (self._outf),
+                  '%s/' + img_name % (self._outf),
                   normalize=True)
