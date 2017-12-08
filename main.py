@@ -257,16 +257,17 @@ for epoch in range(opt.niter):
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-        if epoch % 200 == 0:
+        if epoch == 0 and i == 0:
             vutils.save_image(real_cpu,
                     '%s/real_samples.png' % (opt.outf),
-                    normalize=True)
+                              normalize=True)
+        if epoch % 50 == 0:
             fake = netG(fixed_noise)
             vutils.save_image(fake.data,
                     '%s/fake_samples_epoch_%03d.png' % (opt.outf, epoch),
                     normalize=True)
 
     # do checkpointing - Are saved in outf/model/
-    if (epoch + 1) % 500 == 0:
+    if (epoch + 1) % 50 == 0:
         torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (opt.outf, epoch))
         torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (opt.outf, epoch))
