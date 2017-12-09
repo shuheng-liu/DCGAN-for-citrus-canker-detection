@@ -1,6 +1,6 @@
 # Deep Convolutional Generative Adversarial Networks - DCGANs
 
-![Generated images from noise on LFW ds after 300 epochs](images/lfw-300epochs.gif)
+![Generated images from noise on wish1104/datasets/citrus-canker-pos-unscaled-augmented90 after 500 epochs](images/citrus-canker-100-500-epochs.gif)
 
 This project implements the paper [Unsupervised Representation Learning with Deep Convolutional Generative Adversarial Networks](http://arxiv.org/abs/1511.06434) from a porting of [pytorch/examples/dcgan](https://github.com/pytorch/examples/tree/master/dcgan) making it usables on [FloydHub](https://www.floydhub.com/).
 
@@ -11,7 +11,7 @@ Before start, the `fixed_noise.pth` (serialized Z vector used for generating ima
 After every 100 training iterations, the files `real_samples.png` and `fake_samples.png` are written to disk
 with the samples from the generative model.
 
-After every epoch, models are saved to: `netG_epoch_%d.pth` and `netD_epoch_%d.pth`
+After every 10 epoch, models are saved to: `netG_epoch_%d.pth` and `netD_epoch_%d.pth`
 
 ## Downloading the LSUN dataset
 You can download the LSUN dataset by cloning [this repo](https://github.com/fyu/lsun) and running
