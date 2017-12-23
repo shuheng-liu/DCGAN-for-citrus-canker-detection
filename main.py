@@ -31,8 +31,8 @@ parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
-parser.add_argument('--dropoutD', action='store_true', help='implements dropout in netD')
-parser.add_argument('--dropoutG', action='store_true', help='implements dropout in netG')
+parser.add_argument('--dropoutD', default=0.0, type=float, help='implements dropout in netD')
+parser.add_argument('--dropoutG', default=0.0, type=float, help='implements dropout in netG')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
 opt = parser.parse_args()
@@ -113,27 +113,27 @@ class _netG(nn.Module):
             self.main = nn.Sequential(
                 # input is Z, going into a convolution
                 nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
-                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
                 nn.BatchNorm2d(ngf * 8),
                 nn.ReLU(True),
                 # state size. (ngf*8) x 4 x 4
                 nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
                 nn.BatchNorm2d(ngf * 4),
                 nn.ReLU(True),
                 # state size. (ngf*4) x 8 x 8
                 nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
                 nn.BatchNorm2d(ngf * 2),
                 nn.ReLU(True),
                 # state size. (ngf*2) x 16 x 16
                 nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
-                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
                 nn.BatchNorm2d(ngf),
                 nn.ReLU(True),
                 # state size. (ngf) x 32 x 32
                 nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
-                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
                 nn.Tanh()
                 # state size. (nc) x 64 x 64
             )
@@ -184,21 +184,21 @@ class _netD(nn.Module):
             self.main = nn.Sequential(
                 # input is (nc) x 64 x 64
                 nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                nn.Dropout2d(p = 0.5, inplace = True), # Comment out to skip dropout
+                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ndf) x 32 x 32
                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-                nn.Dropout2d(p = 0.5, inplace = True), # Comment out to skip dropout
+                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
                 nn.BatchNorm2d(ndf * 2),
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ndf*2) x 16 x 16
                 nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-                nn.Dropout2d(p = 0.5, inplace = True), # Comment out to skip dropout
+                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
                 nn.BatchNorm2d(ndf * 4),
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ndf*4) x 8 x 8
                 nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-                nn.Dropout2d(p = 0.5, inplace = True), # Comment out to skip dropout
+                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ndf*8) x 4 x 4
@@ -305,8 +305,8 @@ for epoch in range(1, opt.niter + 1):
         ############################
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
-        netG.zero_grad()
         netG.train()
+        netG.zero_grad()
         labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
         output = netD(fake)
         errG = criterion(output, labelv)
@@ -322,7 +322,7 @@ for epoch in range(1, opt.niter + 1):
 
     if epoch % 10 == 0 or opt.niter - epoch <= 10:
         fake = netG(fixed_noise)
-        vutils.save_image(fake.data, '%s/fake_samples_epoch_%03d.png' % (opt.outf, epoch), normalize=True)
+        vutils.save_image(fake.data, '%s/fake_samples_epoch_%04d.png' % (opt.outf, epoch), normalize=True)
 
     # do checkpointing - Are saved in outf/model/
     if epoch % 10 == 0 or opt.niter - epoch <= 10:
