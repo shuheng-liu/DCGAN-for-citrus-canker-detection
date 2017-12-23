@@ -31,7 +31,8 @@ parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
-parser.add_argument('--dropout', action='store_true', help='implements dropout in netD')
+parser.add_argument('--dropoutD', action='store_true', help='implements dropout in netD')
+parser.add_argument('--dropoutG', action='store_true', help='implements dropout in netG')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
 opt = parser.parse_args()
@@ -108,28 +109,57 @@ class _netG(nn.Module):
     def __init__(self, ngpu):
         super(_netG, self).__init__()
         self.ngpu = ngpu
-        self.main = nn.Sequential(
-            # input is Z, going into a convolution
-            nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
-            # state size. (ngf*8) x 4 x 4
-            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 4),
-            nn.ReLU(True),
-            # state size. (ngf*4) x 8 x 8
-            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf * 2),
-            nn.ReLU(True),
-            # state size. (ngf*2) x 16 x 16
-            nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
-            nn.BatchNorm2d(ngf),
-            nn.ReLU(True),
-            # state size. (ngf) x 32 x 32
-            nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
-            nn.Tanh()
-            # state size. (nc) x 64 x 64
-        )
+        if opt.dropoutG:
+            self.main = nn.Sequential(
+                # input is Z, going into a convolution
+                nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.BatchNorm2d(ngf * 8),
+                nn.ReLU(True),
+                # state size. (ngf*8) x 4 x 4
+                nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.BatchNorm2d(ngf * 4),
+                nn.ReLU(True),
+                # state size. (ngf*4) x 8 x 8
+                nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.BatchNorm2d(ngf * 2),
+                nn.ReLU(True),
+                # state size. (ngf*2) x 16 x 16
+                nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.BatchNorm2d(ngf),
+                nn.ReLU(True),
+                # state size. (ngf) x 32 x 32
+                nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+                nn.Dropout2d(inplace=True), # Comment out to skip Dropout
+                nn.Tanh()
+                # state size. (nc) x 64 x 64
+            )
+        else:
+            self.main = nn.Sequential(
+                # input is Z, going into a convolution
+                nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+                nn.BatchNorm2d(ngf * 8),
+                nn.ReLU(True),
+                # state size. (ngf*8) x 4 x 4
+                nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf * 4),
+                nn.ReLU(True),
+                # state size. (ngf*4) x 8 x 8
+                nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf * 2),
+                nn.ReLU(True),
+                # state size. (ngf*2) x 16 x 16
+                nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+                nn.BatchNorm2d(ngf),
+                nn.ReLU(True),
+                # state size. (ngf) x 32 x 32
+                nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+                nn.Tanh()
+                # state size. (nc) x 64 x 64
+            )
 
     def forward(self, input):
         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
@@ -150,7 +180,7 @@ class _netD(nn.Module):
     def __init__(self, ngpu):
         super(_netD, self).__init__()
         self.ngpu = ngpu
-        if opt.dropout:
+        if opt.dropoutD:
             self.main = nn.Sequential(
                 # input is (nc) x 64 x 64
                 nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
@@ -262,6 +292,7 @@ for epoch in range(1, opt.niter + 1):
         # train with fake
         noise.resize_(batch_size, nz, 1, 1).normal_(0, 1)
         noisev = Variable(noise)
+        netG.eval()
         fake = netG(noisev)
         labelv = Variable(label.fill_(fake_label))
         output = netD(fake.detach())
@@ -275,6 +306,7 @@ for epoch in range(1, opt.niter + 1):
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
         netG.zero_grad()
+        netG.train()
         labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
         output = netD(fake)
         errG = criterion(output, labelv)
@@ -285,17 +317,14 @@ for epoch in range(1, opt.niter + 1):
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
-        if epoch == 1 and i == 0:
-            vutils.save_image(real_cpu,
-                    '%s/real_samples.png' % (opt.outf),
-                              normalize=True)
-        if epoch % 10 == 0:
-            fake = netG(fixed_noise)
-            vutils.save_image(fake.data,
-                    '%s/fake_samples_epoch_%03d.png' % (opt.outf, epoch),
-                    normalize=True)
+        if epoch ==  1 and i == 0:
+            vutils.save_image(real_cpu, '%s/real_samples.png' % (opt.outf), normalize=True)
+
+    if epoch % 10 == 0 or opt.niter - epoch <= 10:
+        fake = netG(fixed_noise)
+        vutils.save_image(fake.data, '%s/fake_samples_epoch_%03d.png' % (opt.outf, epoch), normalize=True)
 
     # do checkpointing - Are saved in outf/model/
-    if epoch % 10 == 0:
+    if epoch % 10 == 0 or opt.niter - epoch <= 10:
         torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (opt.outf, epoch))
         torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (opt.outf, epoch))
