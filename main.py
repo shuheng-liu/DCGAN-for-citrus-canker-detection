@@ -24,7 +24,8 @@ parser.add_argument('--nz', type=int, default=100, help='size of the latent z ve
 parser.add_argument('--ngf', type=int, default=64)
 parser.add_argument('--ndf', type=int, default=64)
 parser.add_argument('--niter', type=int, default=25, help='number of epochs to train for')
-parser.add_argument('--lr', type=float, default=0.0002, help='learning rate, default=0.0002')
+parser.add_argument('--lrD', type=float, default=0.0002, help='learning rate for D, default=0.0002')
+parser.add_argument('--lrG', type=float, default=0.0002, help='learning rate for G, default=0.0002')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam, default=0.5')
 parser.add_argument('--cuda', action='store_true', help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
@@ -133,7 +134,7 @@ class _netG(nn.Module):
                 nn.ReLU(True),
                 # state size. (ngf) x 32 x 32
                 nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
+                                # There should not be any dropout after converting to RGB
                 nn.Tanh()
                 # state size. (nc) x 64 x 64
             )
@@ -203,6 +204,7 @@ class _netD(nn.Module):
                 nn.LeakyReLU(0.2, inplace=True),
                 # state size. (ndf*8) x 4 x 4
                 nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
                 nn.Sigmoid()
             )
         else:
@@ -265,8 +267,8 @@ if opt.cuda:
 fixed_noise = Variable(fixed_noise)
 
 # setup optimizer
-optimizerD = optim.Adam(netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-optimizerG = optim.Adam(netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+optimizerD = optim.Adam(netD.parameters(), lr=opt.lrD, betas=(opt.beta1, 0.999))
+optimizerG = optim.Adam(netG.parameters(), lr=opt.lrG, betas=(opt.beta1, 0.999))
 
 for epoch in range(1, opt.niter + 1):
     for i, data in enumerate(dataloader, 0):
