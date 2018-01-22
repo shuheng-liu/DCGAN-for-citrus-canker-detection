@@ -12,7 +12,7 @@ import torchvision.datasets as dset
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from torch.autograd import Variable
-
+from models import _netG, _netD, weights_init
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw | fake')
@@ -32,8 +32,10 @@ parser.add_argument('--ngpu', type=int, default=1, help='number of GPUs to use')
 parser.add_argument('--netG', default='', help="path to netG (to continue training)")
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
-parser.add_argument('--dropoutD', default=0.0, type=float, help='implements dropout in netD')
-parser.add_argument('--dropoutG', default=0.0, type=float, help='implements dropout in netG')
+parser.add_argument('--dropoutD', default=None, type=float, help='implements dropout in netD')
+parser.add_argument('--dropoutG', default=None, type=float, help='implements dropout in netG')
+parser.add_argument('--c_rate', default=10, type=int, help='How many epochs to save a checkpoint')
+parser.add_argument('--v_rate', default=10, type=int, help='How many epochs to save a generated sample visual')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
 opt = parser.parse_args()
@@ -85,7 +87,7 @@ elif opt.dataset == 'cifar10':
 elif opt.dataset == 'fake':
     dataset = dset.FakeData(image_size=(3, opt.imageSize, opt.imageSize),
                             transform=transforms.ToTensor())
-assert dataset
+assert dataset, 'dataset is not loaded, check if the --dataset flag is properly set'
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=opt.batchSize,
                                          shuffle=True, num_workers=int(opt.workers))
 
@@ -95,151 +97,150 @@ ngf = int(opt.ngf)
 ndf = int(opt.ndf)
 nc = 3
 
-
 # custom weights initialization called on netG and netD
-def weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        m.weight.data.normal_(0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        m.weight.data.normal_(1.0, 0.02)
-        m.bias.data.fill_(0)
+# def weights_init(m):
+#     classname = m.__class__.__name__
+#     if classname.find('Conv') != -1:
+#         m.weight.data.normal_(0.0, 0.02)
+#     elif classname.find('BatchNorm') != -1:
+#         m.weight.data.normal_(1.0, 0.02)
+#         m.bias.data.fill_(0)
 
 
-class _netG(nn.Module):
-    def __init__(self, ngpu):
-        super(_netG, self).__init__()
-        self.ngpu = ngpu
-        if opt.dropoutG:
-            self.main = nn.Sequential(
-                # input is Z, going into a convolution
-                nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
-                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
-                nn.BatchNorm2d(ngf * 8),
-                nn.ReLU(True),
-                # state size. (ngf*8) x 4 x 4
-                nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
-                nn.BatchNorm2d(ngf * 4),
-                nn.ReLU(True),
-                # state size. (ngf*4) x 8 x 8
-                nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
-                nn.BatchNorm2d(ngf * 2),
-                nn.ReLU(True),
-                # state size. (ngf*2) x 16 x 16
-                nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
-                nn.BatchNorm2d(ngf),
-                nn.ReLU(True),
-                # state size. (ngf) x 32 x 32
-                nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
-                                # There should not be any dropout after converting to RGB
-                nn.Tanh()
-                # state size. (nc) x 64 x 64
-            )
-        else:
-            self.main = nn.Sequential(
-                # input is Z, going into a convolution
-                nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
-                nn.BatchNorm2d(ngf * 8),
-                nn.ReLU(True),
-                # state size. (ngf*8) x 4 x 4
-                nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
-                nn.BatchNorm2d(ngf * 4),
-                nn.ReLU(True),
-                # state size. (ngf*4) x 8 x 8
-                nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
-                nn.BatchNorm2d(ngf * 2),
-                nn.ReLU(True),
-                # state size. (ngf*2) x 16 x 16
-                nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
-                nn.BatchNorm2d(ngf),
-                nn.ReLU(True),
-                # state size. (ngf) x 32 x 32
-                nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
-                nn.Tanh()
-                # state size. (nc) x 64 x 64
-            )
+# class _netG(nn.Module):
+#     def __init__(self, ngpu):
+#         super(_netG, self).__init__()
+#         self.ngpu = ngpu
+#         if opt.dropoutG is not None:
+#             self.main = nn.Sequential(
+#                 # input is Z, going into a convolution
+#                 nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
+#                 nn.BatchNorm2d(ngf * 8),
+#                 nn.ReLU(True),
+#                 # state size. (ngf*8) x 4 x 4
+#                 nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
+#                 nn.BatchNorm2d(ngf * 4),
+#                 nn.ReLU(True),
+#                 # state size. (ngf*4) x 8 x 8
+#                 nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
+#                 nn.BatchNorm2d(ngf * 2),
+#                 nn.ReLU(True),
+#                 # state size. (ngf*2) x 16 x 16
+#                 nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutG, inplace=True), # Comment out to skip Dropout
+#                 nn.BatchNorm2d(ngf),
+#                 nn.ReLU(True),
+#                 # state size. (ngf) x 32 x 32
+#                 nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+#                 # There should not be any dropout after converting to RGB
+#                 nn.Tanh()
+#                 # state size. (nc) x 64 x 64
+#             )
+#         else:
+#             self.main = nn.Sequential(
+#                 # input is Z, going into a convolution
+#                 nn.ConvTranspose2d(     nz, ngf * 8, 4, 1, 0, bias=False),
+#                 nn.BatchNorm2d(ngf * 8),
+#                 nn.ReLU(True),
+#                 # state size. (ngf*8) x 4 x 4
+#                 nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+#                 nn.BatchNorm2d(ngf * 4),
+#                 nn.ReLU(True),
+#                 # state size. (ngf*4) x 8 x 8
+#                 nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+#                 nn.BatchNorm2d(ngf * 2),
+#                 nn.ReLU(True),
+#                 # state size. (ngf*2) x 16 x 16
+#                 nn.ConvTranspose2d(ngf * 2,     ngf, 4, 2, 1, bias=False),
+#                 nn.BatchNorm2d(ngf),
+#                 nn.ReLU(True),
+#                 # state size. (ngf) x 32 x 32
+#                 nn.ConvTranspose2d(    ngf,      nc, 4, 2, 1, bias=False),
+#                 nn.Tanh()
+#                 # state size. (nc) x 64 x 64
+#             )
+#
+#     def forward(self, input):
+#         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+#             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+#         else:
+#             output = self.main(input)
+#         return output
 
-    def forward(self, input):
-        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
-        else:
-            output = self.main(input)
-        return output
 
-
-netG = _netG(ngpu)
+netG = _netG(ngpu, dropout=opt.dropoutG, nz=nz, ngf=ngf, nc=nc)
 netG.apply(weights_init)
 if opt.netG != '':
     netG.load_state_dict(torch.load(opt.netG))
 print(netG)
 
 
-class _netD(nn.Module):
-    def __init__(self, ngpu):
-        super(_netD, self).__init__()
-        self.ngpu = ngpu
-        if opt.dropoutD:
-            self.main = nn.Sequential(
-                # input is (nc) x 64 x 64
-                nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf) x 32 x 32
-                nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
-                nn.BatchNorm2d(ndf * 2),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf*2) x 16 x 16
-                nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
-                nn.BatchNorm2d(ndf * 4),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf*4) x 8 x 8
-                nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
-                nn.BatchNorm2d(ndf * 8),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf*8) x 4 x 4
-                nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-                nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
-                nn.Sigmoid()
-            )
-        else:
-            self.main = nn.Sequential(
-                # input is (nc) x 64 x 64
-                nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf) x 32 x 32
-                nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
-                nn.BatchNorm2d(ndf * 2),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf*2) x 16 x 16
-                nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
-                nn.BatchNorm2d(ndf * 4),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf*4) x 8 x 8
-                nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
-                nn.BatchNorm2d(ndf * 8),
-                nn.LeakyReLU(0.2, inplace=True),
-                # state size. (ndf*8) x 4 x 4
-                nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-                nn.Sigmoid()
-            )
+# class _netD(nn.Module):
+#     def __init__(self, ngpu):
+#         super(_netD, self).__init__()
+#         self.ngpu = ngpu
+#         if opt.dropoutD:
+#             self.main = nn.Sequential(
+#                 # input is (nc) x 64 x 64
+#                 nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf) x 32 x 32
+#                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
+#                 nn.BatchNorm2d(ndf * 2),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf*2) x 16 x 16
+#                 nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
+#                 nn.BatchNorm2d(ndf * 4),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf*4) x 8 x 8
+#                 nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+#                 nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
+#                 nn.BatchNorm2d(ndf * 8),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf*8) x 4 x 4
+#                 nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+#                 # nn.Dropout2d(p=opt.dropoutD, inplace=True), # Comment out to skip dropout
+#                 nn.Sigmoid()
+#             )
+#         else:
+#             self.main = nn.Sequential(
+#                 # input is (nc) x 64 x 64
+#                 nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf) x 32 x 32
+#                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+#                 nn.BatchNorm2d(ndf * 2),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf*2) x 16 x 16
+#                 nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+#                 nn.BatchNorm2d(ndf * 4),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf*4) x 8 x 8
+#                 nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+#                 nn.BatchNorm2d(ndf * 8),
+#                 nn.LeakyReLU(0.2, inplace=True),
+#                 # state size. (ndf*8) x 4 x 4
+#                 nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+#                 nn.Sigmoid()
+#             )
+# 
+# 
+#     def forward(self, input):
+#         if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
+#             output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
+#         else:
+#             output = self.main(input)
+# 
+#         return output.view(-1, 1).squeeze(1)
 
 
-    def forward(self, input):
-        if isinstance(input.data, torch.cuda.FloatTensor) and self.ngpu > 1:
-            output = nn.parallel.data_parallel(self.main, input, range(self.ngpu))
-        else:
-            output = self.main(input)
-
-        return output.view(-1, 1).squeeze(1)
-
-
-netD = _netD(ngpu)
+netD = _netD(ngpu, dropout=opt.dropoutD, nz=nz, ndf=ndf)
 netD.apply(weights_init)
 if opt.netD != '':
     netD.load_state_dict(torch.load(opt.netD))
@@ -294,7 +295,7 @@ for epoch in range(1, opt.niter + 1):
         # train with fake
         noise.resize_(batch_size, nz, 1, 1).normal_(0, 1)
         noisev = Variable(noise)
-        netG.eval()
+        # netG.eval()
         fake = netG(noisev)
         labelv = Variable(label.fill_(fake_label))
         output = netD(fake.detach())
@@ -307,7 +308,7 @@ for epoch in range(1, opt.niter + 1):
         ############################
         # (2) Update G network: maximize log(D(G(z)))
         ###########################
-        netG.train()
+        # netG.train()
         netG.zero_grad()
         labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
         output = netD(fake)
@@ -322,11 +323,11 @@ for epoch in range(1, opt.niter + 1):
         if epoch ==  1 and i == 0:
             vutils.save_image(real_cpu, '%s/real_samples.png' % (opt.outf), normalize=True)
 
-    if epoch % 10 == 0 or opt.niter - epoch <= 10:
+    if epoch % opt.v_rate == 0 or opt.niter - epoch <= 10:
         fake = netG(fixed_noise)
         vutils.save_image(fake.data, '%s/fake_samples_epoch_%04d.png' % (opt.outf, epoch), normalize=True)
 
     # do checkpointing - Are saved in outf/model/
-    if epoch % 10 == 0 or opt.niter - epoch <= 10:
+    if epoch % opt.c_rate == 0 or opt.niter - epoch <= 10:
         torch.save(netG.state_dict(), '%s/netG_epoch_%d.pth' % (opt.outf, epoch))
         torch.save(netD.state_dict(), '%s/netD_epoch_%d.pth' % (opt.outf, epoch))
