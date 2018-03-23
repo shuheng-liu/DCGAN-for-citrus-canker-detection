@@ -37,7 +37,7 @@ parser.add_argument('--outf', default='.', help='folder to output images and mod
 parser.add_argument('--dropoutD', default=None, type=float, help='implements dropout in netD')
 parser.add_argument('--dropoutG', default=None, type=float, help='implements dropout in netG')
 parser.add_argument('--c_rate', default=10, type=int, help='How many epochs to save a checkpoint')
-parser.add_argument('--v_rate', default=10, type=int, help='How many epochs to save a generated sample visual')
+parser.add_argument('--v_rate', default=10, type=int, help='How many epochs to save a generated visual sample')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 
 opt = parser.parse_args()
