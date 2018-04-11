@@ -32,9 +32,7 @@ if opt.outf:
     outf = opt.outf
 
 # GPU and CUDA
-cuda = None
-if opt.cuda:
-    cuda = opt.cuda
+cuda = opt.cuda if opt.cuda else None
 ngpu = int(opt.ngpu)
 nsample = int(opt.nsample)
 
@@ -47,4 +45,4 @@ for index in range(nsample):
     Generator.build_model()
     if opt.eval:
         Generator.set_G_eval()
-    Generator.generate(img_name='generated_%04d.png' % index)
+    Generator.generate(img_name='generated_%04d.jpg' % index)

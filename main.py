@@ -36,6 +36,8 @@ parser.add_argument('--netD', default='', help="path to netD (to continue traini
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
 parser.add_argument('--dropoutD', default=None, type=float, help='implements dropout in netD')
 parser.add_argument('--dropoutG', default=None, type=float, help='implements dropout in netG')
+parser.add_argument('--fixD', action = 'store_true', help='fix the Discriminator while training Generator')
+parser.add_argument('--GtoDratio', default=1, type=int, help='How many G iters to run per D iter')
 parser.add_argument('--c_rate', default=10, type=int, help='How many epochs to save a checkpoint')
 parser.add_argument('--v_rate', default=10, type=int, help='How many epochs to save a generated visual sample')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
@@ -140,12 +142,14 @@ met = Metrics(beta=0.9)
 metric_names = ('LossD', 'LossG', 'D(x)', 'D(G(z))1', 'D(G(z))2')
 met.update_metrics(metric_names, None)
 
+if opt.fixD: netD.eval() # set netD to eval while Training netG
 for epoch in range(1, opt.niter + 1):
     LossD_epoch, LossG_epoch, D_x_epoch, D_G_z1_epoch, D_G_z2_epoch = 0., 0., 0., 0., 0.
     for i, data in enumerate(dataloader, 0):
-        ############################
-        # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-        ###########################
+
+    ############################
+    # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+    ###########################
         # train with real
         netD.zero_grad()
         real_cpu, _ = data
@@ -159,7 +163,7 @@ for epoch in range(1, opt.niter + 1):
 
         output = netD(inputv)
         errD_real = criterion(output, labelv)
-        errD_real.backward()
+        errD_real.backward(retain_graph=True)
         D_x = output.data.mean()
 
         # train with fake
@@ -170,40 +174,41 @@ for epoch in range(1, opt.niter + 1):
         labelv = Variable(label.fill_(fake_label))
         output = netD(fake.detach())
         errD_fake = criterion(output, labelv)
-        errD_fake.backward()
+        errD_fake.backward(retain_graph=True)
         D_G_z1 = output.data.mean()
         errD = errD_real + errD_fake
         optimizerD.step()
 
-        ############################
-        # (2) Update G network: maximize log(D(G(z)))
-        ###########################
-        # netG.train()
-        netG.zero_grad()
-        labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
-        output = netD(fake)
-        errG = criterion(output, labelv)
-        errG.backward()
-        D_G_z2 = output.data.mean()
-        optimizerG.step()
+        for G_iter in range(int(opt.GtoDratio)):
+            ############################
+            # (2) Update G network: maximize log(D(G(z)))
+            ###########################
+            # netG.train() # default
+            netG.zero_grad()
+            labelv = Variable(label.fill_(real_label))  # fake labels are real for generator cost
+            output = netD(fake)
+            errG = criterion(output, labelv)
+            errG.backward(retain_graph=True)
+            D_G_z2 = output.data.mean()
+            optimizerG.step()
 
         print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f D(x): %.4f D(G(z)): %.4f / %.4f'
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
         LossD_epoch += errD.data[0]
-        LossG_epoch += errG.data[0]
+        LossG_epoch += ezrrG.data[0]
         D_x_epoch += D_x
         D_G_z1_epoch += D_G_z1
         D_G_z2_epoch += D_G_z2
         if epoch ==  1 and i == 0:
-            vutils.save_image(real_cpu, '%s/real_samples.png' % (opt.outf), normalize=True)
+            vutils.save_image(real_cpu, '%s/real_samples.jpg' % (opt.outf), normalize=True)
     # calculate metrics_dict of this epoch, prepare to write to sys.stdout
     metric_values = (LossD_epoch/(i+1), LossG_epoch/(i+1), D_x_epoch/(i+1), D_G_z1_epoch/(i+1), D_G_z2_epoch/(i+1))
     met.update_metrics(metric_names, metric_values)
 
     if epoch % opt.v_rate == 0 or opt.niter - epoch <= 10:
         fake = netG(fixed_noise)
-        vutils.save_image(fake.data, '%s/fake_samples_epoch_%04d.png' % (opt.outf, epoch), normalize=True)
+        vutils.save_image(fake.data, '%s/fake_samples_epoch_%04d.jpg' % (opt.outf, epoch), normalize=True)
         met.write_metrics()
 
     # do checkpointing - Are saved in outf/model/

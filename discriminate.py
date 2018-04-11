@@ -135,7 +135,7 @@ for i, data in enumerate(dataloader, 0):
     print(" output of batch %d generated" % i)
 
 print("The shape of the pred vector is:", predictions.shape)
-print("The median of the predictions is:", np.median(predictions))
+print("The median of predictions is:", np.median(predictions))
 print("The mean of predictions is:", predictions.mean())
 print("The std of predictions is:", predictions.std())
 np.savetxt('/output/predictions.txt', predictions)
