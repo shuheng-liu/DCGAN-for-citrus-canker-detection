@@ -196,7 +196,7 @@ for epoch in range(1, opt.niter + 1):
               % (epoch, opt.niter, i, len(dataloader),
                  errD.data[0], errG.data[0], D_x, D_G_z1, D_G_z2))
         LossD_epoch += errD.data[0]
-        LossG_epoch += ezrrG.data[0]
+        LossG_epoch += errG.data[0]
         D_x_epoch += D_x
         D_G_z1_epoch += D_G_z1
         D_G_z2_epoch += D_G_z2
