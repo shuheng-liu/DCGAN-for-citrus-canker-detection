@@ -13,11 +13,6 @@ inf = opt.inf
 outf = opt.outf
 maxImages = int(opt.maxImages)
 
-for folder in os.listdir(inf):
-    if not os.path.isdir(os.path.join(inf, folder)): continue
-    try:
-        os.mkdir(os.path.join(outf, folder))
-    except:
-        pass
-    print("handling %s" % folder)
-    handle_folder(os.path.join(inf, folder), os.path.join(outf, folder), max_imgs=maxImages)
+try: os.mkdir(outf)
+except: pass
+handle_folder(inf, outf, max_imgs=maxImages)
