@@ -19,7 +19,7 @@ from metrics import Metrics
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=True, help='cifar10 | lsun | imagenet | folder | lfw | fake')
 parser.add_argument('--dataroot', required=True, help='path to dataset')
-parser.add_argument('--workers', type=int, help='number of data loading workers', default=2)
+parser.add_argument('--workers', type=int, help='number of data loading workers', default=4)
 parser.add_argument('--batchSize', type=int, default=64, help='input batch size')
 parser.add_argument('--imageSize', type=int, default=64, help='the height / width of the input image to network')
 parser.add_argument('--nz', type=int, default=100, help='size of the latent z vector')
@@ -36,7 +36,7 @@ parser.add_argument('--netD', default='', help="path to netD (to continue traini
 parser.add_argument('--outf', default='.', help='folder to output images and model checkpoints')
 parser.add_argument('--dropoutD', default=None, type=float, help='implements dropout in netD')
 parser.add_argument('--dropoutG', default=None, type=float, help='implements dropout in netG')
-parser.add_argument('--fixD', action = 'store_true', help='fix the Discriminator while training Generator')
+parser.add_argument('--fixD', action='store_true', help='fix the Discriminator while training Generator')
 parser.add_argument('--GtoDratio', default=1, type=int, help='How many G iters to run per D iter')
 parser.add_argument('--c_rate', default=10, type=int, help='How many epochs to save a checkpoint')
 parser.add_argument('--v_rate', default=10, type=int, help='How many epochs to save a generated visual sample')
@@ -142,14 +142,14 @@ met = Metrics(beta=0.9)
 metric_names = ('LossD', 'LossG', 'D(x)', 'D(G(z))1', 'D(G(z))2')
 met.update_metrics(metric_names, None)
 
-if opt.fixD: netD.eval() # set netD to eval while Training netG
+if opt.fixD: netD.eval()  # set netD to eval while Training netG
 for epoch in range(1, opt.niter + 1):
     LossD_epoch, LossG_epoch, D_x_epoch, D_G_z1_epoch, D_G_z2_epoch = 0., 0., 0., 0., 0.
     for i, data in enumerate(dataloader, 0):
 
-    ############################
-    # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-    ###########################
+        ############################
+        # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+        ###########################
         # train with real
         netD.zero_grad()
         real_cpu, _ = data
@@ -200,11 +200,15 @@ for epoch in range(1, opt.niter + 1):
         D_x_epoch += D_x
         D_G_z1_epoch += D_G_z1
         D_G_z2_epoch += D_G_z2
-        if epoch ==  1 and i == 0:
+        if epoch == 1 and i == 0:
             vutils.save_image(real_cpu, '%s/real_samples.jpg' % (opt.outf), normalize=True)
     # calculate metrics_dict of this epoch, prepare to write to sys.stdout
-    metric_values = (LossD_epoch/(i+1), LossG_epoch/(i+1), D_x_epoch/(i+1), D_G_z1_epoch/(i+1), D_G_z2_epoch/(i+1))
-    met.update_metrics(metric_names, metric_values)
+    try:
+        i += 1
+        metric_values = (LossD_epoch / i, LossG_epoch / i, D_x_epoch / i, D_G_z1_epoch / i, D_G_z2_epoch / i)
+        met.update_metrics(metric_names, metric_values)
+    except NameError:
+        pass
 
     if epoch % opt.v_rate == 0 or opt.niter - epoch <= 10:
         fake = netG(fixed_noise)
